@@ -25,9 +25,10 @@ public sealed class DbSeederHostedService : IHostedService
             users.Add(new User
             {
                 Email = $"demo{i}@example.com",
-                DisplayName = $"デモ作業者{i}",
+                DisplayName = i == 1 ? "デモリーダー" : $"デモ作業者{i}",
                 PasswordHash = hash,
-                PasswordSalt = salt
+                PasswordSalt = salt,
+                Role = i == 1 ? UserRole.Leader : UserRole.Worker
             });
         }
         db.Users.AddRange(users);
@@ -60,6 +61,10 @@ public sealed class DbSeederHostedService : IHostedService
             }));
         }
         db.ProjectMembers.AddRange(members);
+
+        var projectNameById = projects.ToDictionary(p => p.Id, p => p.Name);
+        var userNameById = users.ToDictionary(u => u.Id, u => u.DisplayName);
+
 
         // Tasks（例: 150件。後で300に増やしてOK）
         var tasks = new List<TaskItem>();
@@ -96,20 +101,25 @@ public sealed class DbSeederHostedService : IHostedService
                 (n % 17 == 0) ? null
                 : PickMemberUserId(members, projectId, n);
 
+            var projectName = projectNameById.TryGetValue(projectId, out var pn) ? pn : $"案件#{projectId}";
+            var assigneeName =
+                assignee is null ? "未割当"
+                : (userNameById.TryGetValue(assignee.Value, out var un) ? un : $"User#{assignee.Value}");
+
             tasks.Add(new TaskItem
             {
                 ProjectId = projectId,
-                Title = $"Task-{n:0000}",
-                Description = $"副業デモ用タスク。案件={projectId} / No={n}",
+                Title = $"作業-{n:0000}",
+                Description = $"案件：{projectName} / 担当：{assigneeName} / No={n}",
                 Status = status,
                 Priority = priority,
                 DueDate = due,
                 AssigneeUserId = assignee,
 
-                // CreatedAt が init のままでも、初期化子ならOK
                 CreatedAt = new DateTime(2026, 2, 1, 9, 0, 0, DateTimeKind.Utc).AddMinutes(n * 3),
                 UpdatedAt = new DateTime(2026, 2, 5, 9, 0, 0, DateTimeKind.Utc).AddMinutes(n * 5),
             });
+
         }
 
         db.Tasks.AddRange(tasks);

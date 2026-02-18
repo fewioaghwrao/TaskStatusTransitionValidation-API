@@ -3,6 +3,12 @@
 // ============================
 namespace TaskStatusTransitionValidation.Domain;
 
+public enum UserRole
+{
+    Leader = 1,
+    Worker = 2
+}
+
 public sealed class User
 {
     public int Id { get; init; }
@@ -10,6 +16,8 @@ public sealed class User
     public string DisplayName { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string PasswordSalt { get; set; } = "";
+
+    public UserRole Role { get; set; } = UserRole.Worker;
 }
 
 public sealed class Project
