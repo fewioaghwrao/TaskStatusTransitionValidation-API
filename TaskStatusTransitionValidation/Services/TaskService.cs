@@ -8,10 +8,9 @@ namespace TaskStatusTransitionValidation.Services;
 
 public interface ITaskService
 {
-    Task<IReadOnlyList<TaskResponse>> ListByProjectAsync(int currentUserId, int projectId, CancellationToken ct);
-    Task<TaskResponse> CreateAsync(int currentUserId, TaskCreateRequest req, CancellationToken ct);
-    Task<TaskResponse> UpdateAsync(int currentUserId, int taskId, TaskUpdateRequest req, CancellationToken ct);
-
+    Task<IReadOnlyList<TaskResponse>> ListByProjectAsync(int currentUserId, UserRole role, int projectId, CancellationToken ct);
+    Task<TaskResponse> CreateAsync(int currentUserId, UserRole role, TaskCreateRequest req, CancellationToken ct);
+    Task<TaskResponse> UpdateAsync(int currentUserId, UserRole role, int taskId, TaskUpdateRequest req, CancellationToken ct);
 }
 
 public sealed class TaskService : ITaskService
@@ -21,7 +20,6 @@ public sealed class TaskService : ITaskService
     private readonly IUserRepository _users;
     private readonly ITaskStatusTransitionPolicy _policy;
 
-    // 推奨：Doneのタスクは更新不可 :contentReference[oaicite:5]{index=5}
     private const bool DisallowAnyUpdateWhenDone = true;
 
     public TaskService(
@@ -36,45 +34,41 @@ public sealed class TaskService : ITaskService
         _policy = policy;
     }
 
-    public async Task<IReadOnlyList<TaskResponse>> ListByProjectAsync(int currentUserId, int projectId, CancellationToken ct)
+    public async Task<IReadOnlyList<TaskResponse>> ListByProjectAsync(
+        int currentUserId,
+        UserRole role,
+        int projectId,
+        CancellationToken ct)
     {
         // プロジェクト存在チェック
         var p = await _projects.FindByIdAsync(projectId, ct);
         if (p is null) throw AppException.NotFound("Project not found.");
 
-        // メンバーでなければ見れない
-        var isMember = await _projects.IsMemberAsync(projectId, currentUserId, ct);
-        if (!isMember) throw AppException.Forbidden("You are not a member of this project.");
+        // Leader以外はメンバー必須
+        if (role != UserRole.Leader)
+        {
+            var isMember = await _projects.IsMemberAsync(projectId, currentUserId, ct);
+            if (!isMember) throw AppException.Forbidden("You are not a member of this project.");
+        }
 
         var list = await _tasks.ListByProjectAsync(projectId, ct);
-
-        // 返却DTOへ
         return list.Select(MapToResponse).ToList();
     }
-    private static TaskResponse MapToResponse(TaskItem t)
-    {
-        return new TaskResponse
-        {
-            TaskId = t.Id,
-            ProjectId = t.ProjectId,
-            Title = t.Title,
-            Description = t.Description,
-            Status = t.Status,
-            Priority = t.Priority,
-            DueDate = t.DueDate,
-            AssigneeUserId = t.AssigneeUserId,
-            CreatedAt = t.CreatedAt,
-            UpdatedAt = t.UpdatedAt
-        };
-    }
 
-    public async Task<TaskResponse> CreateAsync(int currentUserId, TaskCreateRequest req, CancellationToken ct)
+    public async Task<TaskResponse> CreateAsync(
+        int currentUserId,
+        UserRole role,
+        TaskCreateRequest req,
+        CancellationToken ct)
     {
-        // A-009: project存在、ログイン、メンバー権限、assignee存在/メンバーチェック、statusはToDo固定 :contentReference[oaicite:6]{index=6}
-        var project = await _projects.FindByIdAsync(req.ProjectId, ct) ?? throw AppException.NotFound("projectId not found.");
-        if (!await _projects.IsMemberAsync(req.ProjectId, currentUserId, ct))
+        // project存在
+        _ = await _projects.FindByIdAsync(req.ProjectId, ct) ?? throw AppException.NotFound("projectId not found.");
+
+        // Leader以外はメンバー必須
+        if (role != UserRole.Leader && !await _projects.IsMemberAsync(req.ProjectId, currentUserId, ct))
             throw AppException.Forbidden("You are not a member of this project.");
 
+        // assigneeの存在/メンバー確認（Leaderでも “assigneeは案件メンバーのみ” を維持）
         if (req.AssigneeUserId.HasValue)
         {
             var assignee = await _users.FindByIdAsync(req.AssigneeUserId.Value, ct);
@@ -92,8 +86,6 @@ public sealed class TaskService : ITaskService
             AssigneeUserId = req.AssigneeUserId,
             DueDate = req.DueDate,
             Priority = req.Priority,
-
-            // 新規作成時 status は常に ToDo :contentReference[oaicite:7]{index=7}
             Status = TaskState.ToDo
         };
 
@@ -101,12 +93,17 @@ public sealed class TaskService : ITaskService
         return Map(created);
     }
 
-    public async Task<TaskResponse> UpdateAsync(int currentUserId, int taskId, TaskUpdateRequest req, CancellationToken ct)
+    public async Task<TaskResponse> UpdateAsync(
+        int currentUserId,
+        UserRole role,
+        int taskId,
+        TaskUpdateRequest req,
+        CancellationToken ct)
     {
-        // A-010: task存在、案件メンバー、状態遷移チェック、assigneeは案件メンバーのみ :contentReference[oaicite:8]{index=8}
         var task = await _tasks.FindByIdAsync(taskId, ct) ?? throw AppException.NotFound("taskId not found.");
 
-        if (!await _projects.IsMemberAsync(task.ProjectId, currentUserId, ct))
+        // Leader以外はメンバー必須
+        if (role != UserRole.Leader && !await _projects.IsMemberAsync(task.ProjectId, currentUserId, ct))
             throw AppException.Forbidden("You are not a member of this project.");
 
         if (DisallowAnyUpdateWhenDone && task.Status == TaskState.Done)
@@ -125,7 +122,7 @@ public sealed class TaskService : ITaskService
             if (!ok) throw AppException.BadRequest("assigneeUserId must be a project member.");
         }
 
-        // 状態遷移チェック（推奨：違反は409） :contentReference[oaicite:9]{index=9}
+        // 状態遷移チェック
         if (!_policy.CanTransition(task.Status, req.Status))
         {
             throw AppException.Conflict("Invalid status transition.", new()
@@ -147,6 +144,20 @@ public sealed class TaskService : ITaskService
         var updated = await _tasks.UpdateAsync(task, ct);
         return Map(updated);
     }
+
+    private static TaskResponse MapToResponse(TaskItem t) => new()
+    {
+        TaskId = t.Id,
+        ProjectId = t.ProjectId,
+        Title = t.Title,
+        Description = t.Description,
+        Status = t.Status,
+        Priority = t.Priority,
+        DueDate = t.DueDate,
+        AssigneeUserId = t.AssigneeUserId,
+        CreatedAt = t.CreatedAt,
+        UpdatedAt = t.UpdatedAt
+    };
 
     private static TaskResponse Map(TaskItem t) => new()
     {

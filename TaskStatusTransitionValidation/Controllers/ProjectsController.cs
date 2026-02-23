@@ -3,7 +3,6 @@
 // ============================
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 using TaskStatusTransitionValidation.Contracts;
 using TaskStatusTransitionValidation.Services;
 
@@ -17,7 +16,6 @@ public sealed class ProjectsController : ControllerBase
     private readonly ICurrentUserService _current;
     private readonly IProjectService _projects;
     private readonly ITaskService _tasks;
-
 
     public ProjectsController(ICurrentUserService current, IProjectService projects, ITaskService tasks)
     {
@@ -33,10 +31,12 @@ public sealed class ProjectsController : ControllerBase
         CancellationToken ct)
     {
         var uid = _current.GetRequiredUserId();
-        return Ok(await _projects.ListAsync(uid, q, archived, ct));
+        var role = _current.GetRequiredUserRole();
+        return Ok(await _projects.ListAsync(uid, role, q, archived, ct));
     }
 
     [HttpPost]
+    [Authorize(Roles = "Leader")]
     public async Task<ActionResult<ProjectDetailResponse>> Create([FromBody] ProjectCreateRequest req, CancellationToken ct)
     {
         var uid = _current.GetRequiredUserId();
@@ -48,22 +48,24 @@ public sealed class ProjectsController : ControllerBase
     public async Task<ActionResult<ProjectDetailResponse>> Get(int projectId, CancellationToken ct)
     {
         var uid = _current.GetRequiredUserId();
-        return Ok(await _projects.GetAsync(uid, projectId, ct));
+        var role = _current.GetRequiredUserRole();
+        return Ok(await _projects.GetAsync(uid, role, projectId, ct));
     }
 
     [HttpPut("{projectId:int}")]
     public async Task<ActionResult<ProjectDetailResponse>> Update(int projectId, [FromBody] ProjectUpdateRequest req, CancellationToken ct)
     {
         var uid = _current.GetRequiredUserId();
-        return Ok(await _projects.UpdateAsync(uid, projectId, req, ct));
+        var role = _current.GetRequiredUserRole();
+        return Ok(await _projects.UpdateAsync(uid, role, projectId, req, ct));
     }
 
     [HttpGet("{projectId:int}/tasks")]
     public async Task<ActionResult<IReadOnlyList<TaskResponse>>> ListTasks(int projectId, CancellationToken ct)
     {
         var uid = _current.GetRequiredUserId();
-        return Ok(await _tasks.ListByProjectAsync(uid, projectId, ct));
+        var role = _current.GetRequiredUserRole();
+        return Ok(await _tasks.ListByProjectAsync(uid, role, projectId, ct));
     }
-
 }
 

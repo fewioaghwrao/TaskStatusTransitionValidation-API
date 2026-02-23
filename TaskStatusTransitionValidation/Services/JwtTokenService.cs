@@ -32,7 +32,12 @@ public sealed class JwtTokenService : IJwtTokenService
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim("displayName", user.DisplayName ?? "")
+            new Claim("displayName", user.DisplayName ?? ""),
+                        // ★追加：Role
+            // ASP.NET Core の [Authorize(Roles="Leader")] などにも効く標準claim
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            // 必要なら数値も（DBのenum値で見たい場合）
+            new Claim("roleId", ((int)user.Role).ToString())
         };
 
         var creds = new SigningCredentials(

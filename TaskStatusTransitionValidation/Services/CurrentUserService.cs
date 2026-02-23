@@ -1,13 +1,13 @@
-﻿// ============================
-// Services/CurrentUserService.cs
-// ============================
+﻿// Services/CurrentUserService.cs
 using System.Security.Claims;
+using TaskStatusTransitionValidation.Domain;
 
 namespace TaskStatusTransitionValidation.Services;
 
 public interface ICurrentUserService
 {
     int GetRequiredUserId();
+    UserRole GetRequiredUserRole();   // ★追加
 }
 
 public sealed class CurrentUserService : ICurrentUserService
@@ -29,5 +29,20 @@ public sealed class CurrentUserService : ICurrentUserService
 
         return id;
     }
-}
 
+    public UserRole GetRequiredUserRole()
+    {
+        var user = _http.HttpContext?.User;
+
+        // ClaimTypes.Role に入れたのでまずそれを見る
+        var roleStr = user?.FindFirstValue(ClaimTypes.Role);
+
+        if (string.IsNullOrWhiteSpace(roleStr))
+            throw AppException.Unauthorized("Missing user role claim.");
+
+        if (!Enum.TryParse<UserRole>(roleStr, ignoreCase: true, out var role))
+            throw AppException.Unauthorized("Invalid user role claim.");
+
+        return role;
+    }
+}

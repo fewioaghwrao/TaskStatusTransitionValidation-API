@@ -24,12 +24,16 @@ public sealed class UsersController : ControllerBase
         // JWTに入ってるものを返す（今の設計だとこれが最短）
         var email = User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? "";
         var displayName = User.FindFirstValue("displayName") ?? "";
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? "Worker";
+        var roleId = User.FindFirstValue("roleId"); 
 
         return Ok(new
         {
             userId,
             email,
-            displayName
+            displayName,
+            role,
+            roleId
         });
     }
 }
