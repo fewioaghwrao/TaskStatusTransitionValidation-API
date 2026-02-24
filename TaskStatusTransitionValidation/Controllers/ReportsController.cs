@@ -37,4 +37,5 @@ public sealed class ReportsController : ControllerBase
         return File(result.Bytes, "text/csv; charset=utf-8", result.FileName);
 
     }
+
 }
