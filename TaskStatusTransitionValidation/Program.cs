@@ -6,12 +6,17 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 using TaskStatusTransitionValidation.Infrastructure;
 using TaskStatusTransitionValidation.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+      {
+          opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+      })
     .ConfigureApiBehaviorOptions(opt =>
     {
         opt.InvalidModelStateResponseFactory = ctx =>
@@ -100,12 +105,13 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseCors("front-dev");
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-app.UseCors("front-dev");
+
 
 // ===== 開発用：起動時に自動Migrate =====
 // （運用では手動 migration 推奨）
