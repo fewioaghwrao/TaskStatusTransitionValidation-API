@@ -104,3 +104,10 @@ public sealed class DashboardSummaryResponse
         public int Done { get; set; }
     }
 }
+
+public sealed class ProjectMemberDto
+{
+    public int UserId { get; init; }
+    public string DisplayName { get; init; } = "";
+    public string Email { get; init; } = "";
+}

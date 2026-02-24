@@ -1,9 +1,14 @@
 ﻿// ============================
 // Services/ProjectService.cs
 // ============================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TaskStatusTransitionValidation.Contracts;
 using TaskStatusTransitionValidation.Domain;
+using TaskStatusTransitionValidation.Infrastructure;
 
 namespace TaskStatusTransitionValidation.Services;
 
@@ -32,6 +37,18 @@ public interface IProjectService
         UserRole role,
         int projectId,
         ProjectUpdateRequest req,
+        CancellationToken ct);
+
+    Task<IReadOnlyList<ProjectMemberDto>> GetMembersAsync(
+        int currentUserId,
+        UserRole role,
+        int projectId,
+        CancellationToken ct);
+
+    Task ArchiveAsync(
+        int currentUserId,
+        UserRole role,
+        int projectId,
         CancellationToken ct);
 }
 
@@ -73,6 +90,7 @@ public sealed class ProjectService : IProjectService
                 });
             }
         }
+
         return list;
     }
 
@@ -135,5 +153,33 @@ public sealed class ProjectService : IProjectService
             Name = updated.Name,
             IsArchived = updated.IsArchived
         };
+    }
+
+    public async Task ArchiveAsync(int currentUserId, UserRole role, int projectId, CancellationToken ct)
+    {
+        if (role != UserRole.Leader)
+            throw AppException.Forbidden("Leader role required.");
+
+        var p = await _projects.FindByIdAsync(projectId, ct)
+            ?? throw AppException.NotFound("projectId not found.");
+
+        if (p.IsArchived) return;
+
+        p.IsArchived = true;
+        await _projects.UpdateAsync(p, ct);
+    }
+
+    public async Task<IReadOnlyList<ProjectMemberDto>> GetMembersAsync(
+        int currentUserId,
+        UserRole role,
+        int projectId,
+        CancellationToken ct)
+    {
+        // LeaderはOK、Workerはその案件メンバーのみOK（GetAsyncと揃える）
+        if (role != UserRole.Leader && !await _projects.IsMemberAsync(projectId, currentUserId, ct))
+            throw AppException.Forbidden("You are not a member of this project.");
+
+        // ✅ ここが修正点：_projects を呼ぶ
+        return await _projects.GetMembersAsync(projectId, ct);
     }
 }

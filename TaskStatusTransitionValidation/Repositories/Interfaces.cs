@@ -1,6 +1,7 @@
 ﻿// ============================
 // Repositories/Interfaces.cs
 // ============================
+using TaskStatusTransitionValidation.Contracts;
 using TaskStatusTransitionValidation.Domain;
 
 namespace TaskStatusTransitionValidation.Services;
@@ -23,6 +24,10 @@ public interface IProjectRepository
     Task<bool> IsMemberAsync(int projectId, int userId, CancellationToken ct);
     Task<bool> IsAssigneeAllowedAsync(int projectId, int? assigneeUserId, CancellationToken ct);
     Task<IReadOnlyList<int>> GetMemberUserIdsAsync(int projectId, CancellationToken ct);
+
+    Task<IReadOnlyList<ProjectMemberDto>> GetMembersAsync(
+    int projectId,
+    CancellationToken ct);
 }
 
 public interface ITaskRepository

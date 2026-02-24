@@ -67,5 +67,25 @@ public sealed class ProjectsController : ControllerBase
         var role = _current.GetRequiredUserRole();
         return Ok(await _tasks.ListByProjectAsync(uid, role, projectId, ct));
     }
+
+    [HttpDelete("{projectId:int}")]
+    [Authorize(Roles = "Leader")]
+    public async Task<IActionResult> Archive(int projectId, CancellationToken ct)
+    {
+        var uid = _current.GetRequiredUserId();
+        var role = _current.GetRequiredUserRole();
+        await _projects.ArchiveAsync(uid, role, projectId, ct);
+        return NoContent();
+    }
+
+    [HttpGet("{projectId}/members")]
+    public async Task<IActionResult> GetMembers(int projectId, CancellationToken ct)
+    {
+        var currentUserId = _current.GetRequiredUserId();
+        var role = _current.GetRequiredUserRole();
+
+        var members = await _projects.GetMembersAsync(currentUserId, role, projectId, ct);
+        return Ok(members);
+    }
 }
 

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using TaskStatusTransitionValidation.Contracts;
 using TaskStatusTransitionValidation.Domain;
 using TaskStatusTransitionValidation.Services;
 
@@ -57,6 +58,28 @@ public sealed class EfProjectRepository : IProjectRepository
             .AnyAsync(m => m.ProjectId == projectId && m.UserId == assigneeUserId.Value, ct);
     }
 
+    public async Task<IReadOnlyList<ProjectMemberDto>> GetMembersAsync(
+    int projectId,
+    CancellationToken ct)
+    {
+        return await _db.ProjectMembers
+            .AsNoTracking()
+            .Where(pm => pm.ProjectId == projectId)
+            .Join(
+                _db.Users,
+                pm => pm.UserId,
+                u => u.Id,
+                (pm, u) => new ProjectMemberDto
+                {
+                    UserId = u.Id,
+                    DisplayName = u.DisplayName,
+                    Email = u.Email
+                }
+            )
+            .OrderBy(x => x.UserId)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<int>> GetMemberUserIdsAsync(int projectId, CancellationToken ct)
         => await _db.ProjectMembers.AsNoTracking()
             .Where(m => m.ProjectId == projectId)
@@ -64,3 +87,5 @@ public sealed class EfProjectRepository : IProjectRepository
             .Distinct()
             .ToListAsync(ct);
 }
+
+
