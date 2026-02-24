@@ -11,6 +11,8 @@ public interface ITaskService
     Task<IReadOnlyList<TaskResponse>> ListByProjectAsync(int currentUserId, UserRole role, int projectId, CancellationToken ct);
     Task<TaskResponse> CreateAsync(int currentUserId, UserRole role, TaskCreateRequest req, CancellationToken ct);
     Task<TaskResponse> UpdateAsync(int currentUserId, UserRole role, int taskId, TaskUpdateRequest req, CancellationToken ct);
+
+    Task<TaskResponse> GetAsync(int currentUserId, UserRole role, int taskId, CancellationToken ct);
 }
 
 public sealed class TaskService : ITaskService
@@ -171,4 +173,14 @@ public sealed class TaskService : ITaskService
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt
     };
+
+    public async Task<TaskResponse> GetAsync(int currentUserId, UserRole role, int taskId, CancellationToken ct)
+    {
+        var task = await _tasks.FindByIdAsync(taskId, ct) ?? throw AppException.NotFound("taskId not found.");
+
+        if (role != UserRole.Leader && !await _projects.IsMemberAsync(task.ProjectId, currentUserId, ct))
+            throw AppException.Forbidden("You are not a member of this project.");
+
+        return MapToResponse(task);
+    }
 }

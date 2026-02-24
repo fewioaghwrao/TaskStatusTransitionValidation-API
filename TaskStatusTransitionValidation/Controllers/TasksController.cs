@@ -38,4 +38,12 @@ public sealed class TasksController : ControllerBase
         var role = _current.GetRequiredUserRole(); // ★追加
         return Ok(await _tasks.UpdateAsync(uid, role, taskId, req, ct)); // ★roleを渡す
     }
+
+    [HttpGet("{taskId:int}")]
+    public async Task<ActionResult<TaskResponse>> Get(int taskId, CancellationToken ct)
+    {
+        var uid = _current.GetRequiredUserId();
+        var role = _current.GetRequiredUserRole();
+        return Ok(await _tasks.GetAsync(uid, role, taskId, ct));
+    }
 }
