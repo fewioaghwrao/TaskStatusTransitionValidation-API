@@ -70,6 +70,9 @@ public sealed class TaskService : ITaskService
         if (role != UserRole.Leader && !await _projects.IsMemberAsync(req.ProjectId, currentUserId, ct))
             throw AppException.Forbidden("You are not a member of this project.");
 
+        if (role != UserRole.Leader && req.AssigneeUserId.HasValue)
+            throw AppException.Forbidden("Worker cannot set assigneeUserId. It must be null.");
+
         // assigneeの存在/メンバー確認（Leaderでも “assigneeは案件メンバーのみ” を維持）
         if (req.AssigneeUserId.HasValue)
         {
@@ -107,6 +110,9 @@ public sealed class TaskService : ITaskService
         // Leader以外はメンバー必須
         if (role != UserRole.Leader && !await _projects.IsMemberAsync(task.ProjectId, currentUserId, ct))
             throw AppException.Forbidden("You are not a member of this project.");
+
+        if (role != UserRole.Leader && req.AssigneeUserId.HasValue)
+            throw AppException.Forbidden("Worker cannot set assigneeUserId. It must be null.");
 
         if (DisallowAnyUpdateWhenDone && task.Status == TaskState.Done)
             throw AppException.Conflict("Done task cannot be updated (policy).", new()
