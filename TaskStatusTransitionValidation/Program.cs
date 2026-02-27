@@ -33,6 +33,7 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 // JWT認証
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -108,15 +109,17 @@ app.UseSwaggerUI();
 app.UseCors("front-dev");
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/health");
 
 app.MapControllers();
 
 
 
-// ===== 開発用：起動時に自動Migrate =====
-// （運用では手動 migration 推奨）
-using (var scope = app.Services.CreateScope())
+// ★置き換え：フラグがtrueのときだけMigrate
+var enableMigration = builder.Configuration.GetValue<bool>("ENABLE_DB_MIGRATION");
+if (enableMigration)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
