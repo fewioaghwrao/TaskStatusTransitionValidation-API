@@ -89,12 +89,22 @@ builder.Services.AddSingleton<ITaskStatusTransitionPolicy, TaskStatusTransitionP
 // Seeder（任意：初回起動時だけデモデータ投入）
 builder.Services.AddHostedService<DbSeederHostedService>();
 
+var origins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
 builder.Services.AddCors(opt =>
 {
-    opt.AddPolicy("front-dev", p =>
-        p.WithOrigins("http://localhost:3000")
-         .AllowAnyHeader()
-         .AllowAnyMethod());
+    opt.AddPolicy("frontend", p =>
+    {
+        // 設定が空ならCORS許可しない（安全側）
+        if (origins.Length > 0)
+        {
+            p.WithOrigins(origins)
+             .AllowAnyHeader()
+             .AllowAnyMethod();
+        }
+    });
 });
 
 var app = builder.Build();
@@ -106,7 +116,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseCors("front-dev");
+app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
