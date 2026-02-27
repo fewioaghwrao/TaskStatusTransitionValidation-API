@@ -120,6 +120,12 @@ app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
+app.MapGet("/", () => Results.Text(
+@"TaskStatusTransitionValidation API
+
+- Swagger UI: /swagger
+- Health: /health
+", "text/plain"));
 
 app.MapControllers();
 
