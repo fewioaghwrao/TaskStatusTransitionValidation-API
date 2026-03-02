@@ -1,141 +1,170 @@
-# Task Status Transition Validation – Backend API
+# 案件タスク管理 Lite（Backend / API）
 
-タスク管理における **状態遷移ルール（ToDo / Doing / Blocked / Done）を明確に定義・検証**することを目的とした  
-バックエンド API サーバーです。  
-フロントエンドと分離した **API 専用構成（ASP.NET Core + EF Core）** になっています。
-
----
-
-## 🔗 公開URL（稼働確認）
-
-- **API Root**  
-  `GET /`  
-  → API 案内を返却（Swagger / Health の案内）
-
-- **Health Check**  
-  `GET /health`  
-  → `Healthy`
-
-- **Swagger UI**  
-  `GET /swagger`  
-  → API 仕様確認・動作検証用
+案件・タスク管理を行う Web アプリケーションの **バックエンド API** です。  
+業務利用を想定し、**状態遷移ルール・権限制御・データ整合性** を重視した設計としています。
 
 ---
 
-## 📌 できること（概要）
+## 🔗 公開エンドポイント（デモ）
 
-- JWT 認証によるユーザー認可
-- プロジェクト管理
-- タスク管理
-- **タスク状態遷移の制御・検証**
-  - 不正な遷移をサーバー側で防止
-- ダッシュボード / レポート用 API
+- API Base  
+  https://taskstsv-be-cacjavgfebh2bucp.japaneast-01.azurewebsites.net
 
-※ UI はフロントエンド側で実装しています（本リポジトリは API のみ）
+- Health Check  
+  https://taskstsv-be-cacjavgfebh2bucp.japaneast-01.azurewebsites.net/health
+
+- Swagger（OpenAPI）  
+  https://taskstsv-be-cacjavgfebh2bucp.japaneast-01.azurewebsites.net/swagger/index.html
 
 ---
 
-## 🧱 アーキテクチャ概要
+## 📌 設計方針
+
+- **状態遷移ルールはサーバー側で一元管理**
+- **権限（Leader / Member）をAPIレイヤーで制御**
+- 業務アプリを想定した **バリデーション・例外設計**
+- フロントエンドと疎結合な REST API
+- 将来的な機能拡張（監査ログ等）を考慮した構成
+
+---
+
+## 🧩 システム構成（概要）
+
+```bash
+[ Frontend (Next.js) ]
+|
+| HTTPS (REST API)
+v
+[ Backend (ASP.NET Core Web API) ]
+|
+v
+[ Database ]
+```
+
+- フロントエンドから直接 API を呼び出す構成
+- 認証はトークンベース
+- Health エンドポイントによる死活監視対応
+
+---
+
+## 🗂 ドメインモデル / ER図
+
+![ER図](docs/images/ER.drawio.png)
+
+### 主なエンティティ
+
+- **User**
+  - ユーザー情報
+  - ロール（Leader / Member）
+
+- **Project**
+  - 案件（プロジェクト）
+  - アーカイブ状態管理
+
+- **Task**
+  - タスク本体
+  - 状態・期限・優先度・担当者
+
+---
+
+## 🔁 タスク状態遷移設計
+
+### ステータス定義
+- `ToDo`
+- `Doing`
+- `Blocked`
+- `Done`
+
+### 許可される遷移
+- ToDo → Doing / Blocked
+- Doing → Blocked / Done
+- Blocked → Doing
+- Done → （変更不可）
+
+※ **不正な遷移は API 側で検証し、400 エラーを返却**
+
+---
+
+## 👤 権限設計（APIレベル）
+
+| 機能 | Leader | Member |
+|---|---|---|
+| 案件作成 | ○ | × |
+| 案件アーカイブ | ○ | × |
+| タスク作成 | ○ | ○ |
+| 担当者指定 | ○ | × |
+| 状態変更 | ○ | ○ |
+| CSV出力 | ○ | ○ |
+
+---
+
+## 🔌 API概要（主要）
+
+### 認証
+- `POST /api/v1/auth/login`
+- トークン発行方式
+
+### 案件
+- `GET /api/v1/projects`
+- `POST /api/v1/projects`
+- `PATCH /api/v1/projects/{id}/archive`
+
+### タスク
+- `GET /api/v1/projects/{id}/tasks`
+- `POST /api/v1/tasks`
+- `PATCH /api/v1/tasks/{id}`
+- `GET /api/v1/tasks/export`（CSV）
+
+※ 詳細は Swagger を参照
+
+---
+
+## 📄 CSV出力仕様（概要）
+
+- 文字コード：UTF-8  
+- 区切り：カンマ  
+- 出力列：  
+  案件名 / タスク名 / 状態 / 優先度 / 期限 / 担当者 / 作成日時 / 更新日時
+
+---
+
+## ⚠ エラー・バリデーション設計
+
+- 入力不備・権限不足・不正遷移は **400 / 403** で返却
+- 業務的に起こりうるエラーは例外メッセージを明示
+- フロント側で判別しやすいレスポンス構造を採用
+
+---
+
+## 🛠 技術スタック（バックエンド）
 
 - ASP.NET Core Web API
-- レイヤード構成
-  - Controllers
-  - Services（業務ロジック）
-  - Repositories（EF Core）
-  - Infrastructure
-- 認証
-  - JWT Bearer Authentication
-- データアクセス
-  - Entity Framework Core
-  - SQL Server
+- C#
+- Entity Framework Core
+- DB：SQL Server（実運用/デモ）
+- Swagger（OpenAPI）
+- Azure App Service（Linux）
 
 ---
 
-## 🔐 認証方式
-
-- JWT Bearer 認証
-- Authorization Header にトークンを付与して API を呼び出します
-
-
----
-
-## ⚙️ 環境変数 / 設定
-
-### 必須設定（例）
-
-```json
-{
-  "ConnectionStrings": {
-    "Default": "Server=...;Database=...;User Id=...;Password=..."
-  },
-  "Jwt": {
-    "Issuer": "TaskStatusTransitionValidation",
-    "Audience": "TaskStatusTransitionValidation",
-    "SigningKey": "your-secret-key"
-  },
-  "Cors": {
-    "AllowedOrigins": [
-      "https://frontend-example.com"
-    ]
-  },
-  "ENABLE_DB_MIGRATION": true,
-  "ENABLE_SWAGGER": true
-}
-```
----
-
-## 🗄️ DB / マイグレーション
-- EF Core を使用
-- 起動時に以下フラグが true の場合、自動で Database.Migrate() を実行
-
-```json
-ENABLE_DB_MIGRATION=true
-```
-
----
-
-## 🌱 デモデータ（Seeder）
-- 初回起動時に デモ用データを自動投入
-- Hosted Service にて実行
-  
-  ※ ローカル / Azure いずれでも動作
-
----
-
-## 🚀 ローカル起動方法
+## 🔧 ローカル起動（概要）
 
 ```bash
 dotnet restore
-dotnet build
 dotnet run
 ```
-起動後：
-- https://localhost:{port}/swagger
-- https://localhost:{port}/health
+※ 接続先DBやCORS設定は環境変数で切替
 
 ---
 
-## 🧪 テスト・検証
-- Swagger UI から API 実行・レスポンス確認が可能
-- JWT 認証付きエンドポイントも Swagger 上で動作確認可能
+## 今後の拡張構想
+- 操作ログ（監査対応）
+- タスクコメント
+- 状態遷移ルールの設定化
+- Webhook / 外部連携
 
 ---
 
-## 🔄 フロントエンドとの関係
-- 本リポジトリ：バックエンド API
-- フロントエンドは別リポジトリで管理
-- CORS は AllowedOrigins にて制御
-
----
-
-## 🧩 設計上のポイント
-- 状態遷移ロジックをポリシーとして切り出し
-- UI 側の実装ミスでも 不正な状態遷移を防止
-- 業務ロジックは Service 層に集約
-- API は UI 非依存で再利用可能
-
----
-
-## 📄 ライセンス
-
-Private / Portfolio Use
+## 補足
+本APIは「画面を作るためのAPI」ではなく、
+業務ルールと整合性を保証するバックエンドを意識して設計しています。
