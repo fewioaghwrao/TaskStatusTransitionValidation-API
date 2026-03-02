@@ -2,6 +2,8 @@
 .vs/
 *.user
 *.suo
+**/appsettings.Development.json
+appsettings.Development.json
 
 # Build outputs
 bin/
