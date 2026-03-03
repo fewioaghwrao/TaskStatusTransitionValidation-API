@@ -18,6 +18,11 @@
 
 ---
 
+## 🔗 関連リポジトリ
+- Frontend（Next.js）: https://github.com/fewioaghwrao/TaskStatusTransitionValidation-Front
+
+---
+
 ## 📌 設計方針
 
 - **状態遷移ルールはサーバー側で一元管理**
